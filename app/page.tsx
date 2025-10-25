@@ -10,6 +10,8 @@ export default function Home() {
   const [continuationFrame, setContinuationFrame] = useState<string | undefined>(undefined);
 
   function handleSelectVideo(item: VideoHistoryItem) {
+    // Clear continuation frame when selecting a history video
+    setContinuationFrame(undefined);
     setResult({
       url: `/api/sora2/download/${item.videoId}`,
       videoId: item.videoId,
@@ -21,6 +23,12 @@ export default function Home() {
     setContinuationFrame(frameDataUrl);
     setShowHistory(false);
     setResult(null);
+  }
+
+  function handleResult(data: { url: string; videoId: string }) {
+    // Clear continuation frame after generating a new video
+    setContinuationFrame(undefined);
+    setResult(data);
   }
 
   return (
@@ -48,7 +56,7 @@ export default function Home() {
           ) : (
             <PromptForm 
               key={continuationFrame || 'default'}
-              onResult={(r) => setResult(r)} 
+              onResult={handleResult} 
               initialReference={continuationFrame}
             />
           )}

@@ -20,35 +20,12 @@ export default function PromptForm({
   const [seconds, setSeconds] = useState("8");
   const [model, setModel] = useState("sora-2");
 
-  const [inputReference, setInputReference] = useState<RefFile | null>(
-    initialReference ? { name: "last-frame.jpg", dataUrl: initialReference } : null
-  );
+  const [inputReference, setInputReference] = useState<RefFile | null>(null);
   const [resizedReference, setResizedReference] = useState<RefFile | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  // Handle initial reference image from continuation
-  useEffect(() => {
-    if (initialReference) {
-      const refFile = { name: "last-frame.jpg", dataUrl: initialReference };
-      setInputReference(refFile);
-      resizeImage(refFile, size).then(setResizedReference);
-    }
-  }, [initialReference]);
-
-  // Calculate estimated cost
-  function getEstimatedCost(): string {
-    const duration = parseInt(seconds);
-    const isPro = model === "sora-2-pro";
-    
-    // Cost per second estimates based on community reports
-    const costPerSecond = isPro ? 0.40 : 0.10; // Pro: $0.30-0.50, Standard: $0.10
-    const totalCost = duration * costPerSecond;
-    
-    return totalCost.toFixed(2);
-  }
 
   // Resize image to match selected resolution
   async function resizeImage(file: RefFile, targetSize: string): Promise<RefFile> {
@@ -71,6 +48,27 @@ export default function PromptForm({
       
       img.src = file.dataUrl;
     });
+  }
+
+  // Handle initial reference image from continuation - runs on mount
+  useEffect(() => {
+    if (initialReference) {
+      const refFile = { name: "last-frame.jpg", dataUrl: initialReference };
+      setInputReference(refFile);
+      resizeImage(refFile, size).then(setResizedReference);
+    }
+  }, []); // Only run on mount since key forces remount
+
+  // Calculate estimated cost
+  function getEstimatedCost(): string {
+    const duration = parseInt(seconds);
+    const isPro = model === "sora-2-pro";
+    
+    // Cost per second estimates based on community reports
+    const costPerSecond = isPro ? 0.40 : 0.10; // Pro: $0.30-0.50, Standard: $0.10
+    const totalCost = duration * costPerSecond;
+    
+    return totalCost.toFixed(2);
   }
 
   // Handle reference image change and resize
