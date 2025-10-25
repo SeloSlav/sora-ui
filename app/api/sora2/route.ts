@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       model,
       prompt,
       size,
-      seconds,
+      seconds, // Keep as string - API expects it this way
     };
 
     // If there's an input reference image, convert it to a file
@@ -56,10 +56,12 @@ export async function POST(req: Request) {
     }
 
     if (video.status === "failed") {
-      throw new Error("Video generation failed");
+      console.error("Video generation failed. Full response:", JSON.stringify(video, null, 2));
+      throw new Error(`Video generation failed: ${(video as any).error?.message || "Unknown error"}`);
     }
 
     if (video.status !== "completed") {
+      console.error("Unexpected status. Full response:", JSON.stringify(video, null, 2));
       throw new Error(`Unexpected status: ${video.status}`);
     }
     

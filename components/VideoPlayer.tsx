@@ -85,8 +85,6 @@ export default function VideoPlayer({ url, videoId }: { url: string; videoId: st
             src={videoUrl}
             controls
             playsInline
-            autoPlay
-            loop
             className="w-full aspect-video object-contain bg-black"
             onError={() => setVideoError(true)}
           />

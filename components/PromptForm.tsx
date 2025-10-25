@@ -215,8 +215,10 @@ export default function PromptForm({
             value={size} 
             onChange={(e) => handleSizeChange(e.target.value)}
           >
-            <option value="1280x720">1280×720</option>
-            <option value="720x1280">720×1280</option>
+            <option value="1920x1080">1920×1080 (16:9)</option>
+            <option value="1080x1920">1080×1920 (9:16)</option>
+            <option value="1280x720">1280×720 (16:9)</option>
+            <option value="720x1280">720×1280 (9:16)</option>
           </select>
         </div>
         <div>
