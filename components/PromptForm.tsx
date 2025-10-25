@@ -216,6 +216,7 @@ export default function PromptForm({
           >
             <option value="4">4s</option>
             <option value="8">8s</option>
+            <option value="12">12s</option>
           </select>
         </div>
         <div>
