@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import ManualVideoLoad from "./ManualVideoLoad";
 
 export type VideoHistoryItem = {
   id: string;
@@ -15,10 +14,8 @@ export type VideoHistoryItem = {
 
 export default function VideoHistory({
   onSelectVideo,
-  onLoadVideoById,
 }: {
   onSelectVideo: (item: VideoHistoryItem) => void;
-  onLoadVideoById: (videoId: string) => void;
 }) {
   const [history, setHistory] = useState<VideoHistoryItem[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -148,9 +145,6 @@ export default function VideoHistory({
           </div>
         ))}
       </div>
-
-      {/* Manual Video Load */}
-      <ManualVideoLoad onLoadVideo={onLoadVideoById} />
     </div>
   );
 }

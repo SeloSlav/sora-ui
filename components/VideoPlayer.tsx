@@ -1,10 +1,19 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-export default function VideoPlayer({ url, videoId }: { url: string; videoId: string }) {
+export default function VideoPlayer({ 
+  url, 
+  videoId,
+  onContinueFromLastFrame 
+}: { 
+  url: string; 
+  videoId: string;
+  onContinueFromLastFrame?: (frameDataUrl: string) => void;
+}) {
   const [downloading, setDownloading] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>("");
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     // Fetch the video blob and create an object URL for playback
@@ -56,6 +65,29 @@ export default function VideoPlayer({ url, videoId }: { url: string; videoId: st
     }
   }
 
+  function captureLastFrame() {
+    if (!videoRef.current || !onContinueFromLastFrame) return;
+
+    const video = videoRef.current;
+    
+    // Seek to the last frame (duration - 0.1 seconds to ensure we get a valid frame)
+    video.currentTime = video.duration - 0.1;
+    
+    // Wait for seek to complete
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frameDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        onContinueFromLastFrame(frameDataUrl);
+      }
+    };
+  }
+
   return (
     <div className="w-full max-w-4xl space-y-4">
       {/* Video Container */}
@@ -82,6 +114,7 @@ export default function VideoPlayer({ url, videoId }: { url: string; videoId: st
           </div>
         ) : (
           <video
+            ref={videoRef}
             src={videoUrl}
             controls
             playsInline
@@ -92,11 +125,11 @@ export default function VideoPlayer({ url, videoId }: { url: string; videoId: st
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <button
           onClick={handleDownload}
           disabled={downloading}
-          className="flex-1 bg-black hover:bg-gray-800 text-white font-medium rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center gap-2 text-sm"
+          className="bg-black hover:bg-gray-800 text-white font-medium rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center gap-2 text-sm"
         >
           {downloading ? (
             <>
@@ -125,6 +158,19 @@ export default function VideoPlayer({ url, videoId }: { url: string; videoId: st
           </svg>
           New Video
         </button>
+
+        {onContinueFromLastFrame && (
+          <button
+            onClick={captureLastFrame}
+            disabled={!videoUrl || videoError}
+            className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center gap-2 text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Continue from Last Frame
+          </button>
+        )}
       </div>
 
       {/* Video Info */}

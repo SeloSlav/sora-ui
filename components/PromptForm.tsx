@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Uploader from "./Uploader";
 import { saveToHistory } from "./VideoHistory";
 
@@ -10,20 +10,33 @@ type RefFile = {
 
 export default function PromptForm({
   onResult,
+  initialReference,
 }: {
   onResult: (data: { url: string; videoId: string }) => void;
+  initialReference?: string;
 }) {
   const [prompt, setPrompt] = useState("");
   const [size, setSize] = useState("1280x720");
   const [seconds, setSeconds] = useState("8");
   const [model, setModel] = useState("sora-2");
 
-  const [inputReference, setInputReference] = useState<RefFile | null>(null);
+  const [inputReference, setInputReference] = useState<RefFile | null>(
+    initialReference ? { name: "last-frame.jpg", dataUrl: initialReference } : null
+  );
   const [resizedReference, setResizedReference] = useState<RefFile | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Handle initial reference image from continuation
+  useEffect(() => {
+    if (initialReference) {
+      const refFile = { name: "last-frame.jpg", dataUrl: initialReference };
+      setInputReference(refFile);
+      resizeImage(refFile, size).then(setResizedReference);
+    }
+  }, [initialReference]);
 
   // Calculate estimated cost
   function getEstimatedCost(): string {

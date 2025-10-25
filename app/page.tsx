@@ -7,6 +7,7 @@ import VideoHistory, { VideoHistoryItem } from "@/components/VideoHistory";
 export default function Home() {
   const [result, setResult] = useState<{ url: string; videoId: string } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [continuationFrame, setContinuationFrame] = useState<string | undefined>(undefined);
 
   function handleSelectVideo(item: VideoHistoryItem) {
     setResult({
@@ -16,12 +17,10 @@ export default function Home() {
     setShowHistory(false);
   }
 
-  function handleLoadVideoById(videoId: string) {
-    setResult({
-      url: `/api/sora2/download/${videoId}`,
-      videoId: videoId,
-    });
+  function handleContinueFromLastFrame(frameDataUrl: string) {
+    setContinuationFrame(frameDataUrl);
     setShowHistory(false);
+    setResult(null);
   }
 
   return (
@@ -45,10 +44,13 @@ export default function Home() {
           {showHistory ? (
             <VideoHistory 
               onSelectVideo={handleSelectVideo}
-              onLoadVideoById={handleLoadVideoById}
             />
           ) : (
-            <PromptForm onResult={(r) => setResult(r)} />
+            <PromptForm 
+              key={continuationFrame || 'default'}
+              onResult={(r) => setResult(r)} 
+              initialReference={continuationFrame}
+            />
           )}
         </div>
       </div>
@@ -56,7 +58,11 @@ export default function Home() {
       {/* Right Panel - Video Preview */}
       <div className="hidden lg:flex flex-1 items-center justify-center bg-gray-50 p-8">
         {result ? (
-          <VideoPlayer url={result.url} videoId={result.videoId} />
+          <VideoPlayer 
+            url={result.url} 
+            videoId={result.videoId}
+            onContinueFromLastFrame={handleContinueFromLastFrame}
+          />
         ) : (
           <div className="text-center max-w-md">
             <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gray-200 flex items-center justify-center">
@@ -83,7 +89,11 @@ export default function Home() {
               </svg>
               Back to controls
             </button>
-            <VideoPlayer url={result.url} videoId={result.videoId} />
+            <VideoPlayer 
+              url={result.url} 
+              videoId={result.videoId}
+              onContinueFromLastFrame={handleContinueFromLastFrame}
+            />
           </div>
         </div>
       )}
