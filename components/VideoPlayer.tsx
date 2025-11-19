@@ -13,7 +13,13 @@ export default function VideoPlayer({
   const [downloading, setDownloading] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>("");
+  const [showFrameExtractor, setShowFrameExtractor] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [extracting, setExtracting] = useState(false);
+  const [framePreview, setFramePreview] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     // Fetch the video blob and create an object URL for playback
@@ -65,6 +71,19 @@ export default function VideoPlayer({
     }
   }
 
+  function handleLoadedMetadata() {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  }
+
+  function handleTimeUpdate() {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  }
+
   function captureLastFrame() {
     if (!videoRef.current || !onContinueFromLastFrame) return;
 
@@ -84,9 +103,76 @@ export default function VideoPlayer({
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const frameDataUrl = canvas.toDataURL('image/jpeg', 0.95);
         onContinueFromLastFrame(frameDataUrl);
+        setShowFrameExtractor(false);
       }
     };
   }
+
+  function captureCurrentFrame() {
+    if (!videoRef.current || !onContinueFromLastFrame) return;
+
+    const video = videoRef.current;
+    
+    // Pause the video to ensure we capture the right frame
+    video.pause();
+    
+    // Wait a moment to ensure the frame is rendered
+    setTimeout(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frameDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        onContinueFromLastFrame(frameDataUrl);
+        setExtracting(true);
+        setTimeout(() => {
+          setExtracting(false);
+          setShowFrameExtractor(false);
+        }, 1500);
+      }
+    }, 100);
+  }
+
+  function seekToTime(time: number) {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      video.pause(); // Pause when scrubbing
+      video.currentTime = time;
+      setCurrentTime(time);
+      
+      // Update preview after seeking
+      video.onseeked = () => {
+        updateFramePreview();
+      };
+    }
+  }
+
+  function updateFramePreview() {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (ctx && video.videoWidth > 0) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const preview = canvas.toDataURL('image/jpeg', 0.8);
+      setFramePreview(preview);
+    }
+  }
+
+  // Update preview when extractor is shown
+  useEffect(() => {
+    if (showFrameExtractor && videoRef.current) {
+      videoRef.current.pause();
+      updateFramePreview();
+    }
+  }, [showFrameExtractor]);
 
   return (
     <div className="w-full max-w-4xl space-y-4">
@@ -120,6 +206,8 @@ export default function VideoPlayer({
             playsInline
             className="w-full aspect-video object-contain bg-black"
             onError={() => setVideoError(true)}
+            onLoadedMetadata={handleLoadedMetadata}
+            onTimeUpdate={handleTimeUpdate}
           />
         )}
       </div>
@@ -160,18 +248,108 @@ export default function VideoPlayer({
         </button>
 
         {onContinueFromLastFrame && (
-          <button
-            onClick={captureLastFrame}
-            disabled={!videoUrl || videoError}
-            className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center gap-2 text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Continue from Last Frame
-          </button>
+          <>
+            <button
+              onClick={() => setShowFrameExtractor(!showFrameExtractor)}
+              disabled={!videoUrl || videoError}
+              className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center gap-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {showFrameExtractor ? 'Hide' : 'Extract'} Frame
+            </button>
+          </>
         )}
       </div>
+
+      {/* Hidden canvas for frame extraction */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      {/* Frame Extractor UI */}
+      {showFrameExtractor && onContinueFromLastFrame && duration > 0 && (
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Extract Frame</h3>
+            <span className="text-sm text-gray-600 font-mono">
+              {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
+            </span>
+          </div>
+          
+          {/* Frame Preview */}
+          {framePreview && (
+            <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-blue-300">
+              <img src={framePreview} alt="Frame preview" className="w-full h-full object-contain" />
+              <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                Preview
+              </div>
+            </div>
+          )}
+          
+          {/* Timeline scrubber */}
+          <div className="space-y-2">
+            <input
+              type="range"
+              min="0"
+              max={duration}
+              step="0.04"
+              value={currentTime}
+              onChange={(e) => seekToTime(parseFloat(e.target.value))}
+              className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between text-xs text-gray-500">
+              <button 
+                onClick={() => seekToTime(0)} 
+                className="hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-100"
+              >
+                ⏮ Start
+              </button>
+              <button 
+                onClick={() => seekToTime(duration / 2)} 
+                className="hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-100"
+              >
+                ⏸ Middle
+              </button>
+              <button 
+                onClick={() => seekToTime(duration - 0.1)} 
+                className="hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-100"
+              >
+                ⏭ End
+              </button>
+            </div>
+          </div>
+          
+          <button
+            onClick={captureCurrentFrame}
+            disabled={extracting}
+            className={`w-full py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+              extracting
+                ? 'bg-green-600 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {extracting ? (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Frame Extracted!
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Extract This Frame
+              </>
+            )}
+          </button>
+          
+          <p className="text-xs text-gray-600 text-center">
+            Drag the slider to find your frame, then click "Extract This Frame"
+          </p>
+        </div>
+      )}
 
       {/* Video Info */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">

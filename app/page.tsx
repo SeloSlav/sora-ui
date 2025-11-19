@@ -12,8 +12,13 @@ export default function Home() {
   function handleSelectVideo(item: VideoHistoryItem) {
     // Clear continuation frame when selecting a history video
     setContinuationFrame(undefined);
+    // Determine download URL based on model
+    const isVeo3 = item.model?.startsWith("veo-");
+    const downloadUrl = isVeo3 
+      ? `/api/veo3/download/${item.videoId}`
+      : `/api/sora2/download/${item.videoId}`;
     setResult({
-      url: `/api/sora2/download/${item.videoId}`,
+      url: downloadUrl,
       videoId: item.videoId,
     });
     setShowHistory(false);

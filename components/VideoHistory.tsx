@@ -122,7 +122,11 @@ export default function VideoHistory({
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <span>{formatDate(item.createdAt)}</span>
                   <span>•</span>
-                  <span>{item.model === "sora-2-pro" ? "Pro" : "Standard"}</span>
+                  <span>
+                    {item.model?.startsWith("veo-") 
+                      ? item.model.replace("veo-", "Veo ").replace("-fast", " Fast")
+                      : item.model === "sora-2-pro" ? "Pro" : "Standard"}
+                  </span>
                   <span>•</span>
                   <span>{item.seconds}s</span>
                 </div>
@@ -149,23 +153,79 @@ export default function VideoHistory({
   );
 }
 
+// Compress thumbnail image to reduce localStorage size
+function compressThumbnail(dataUrl: string, maxWidth = 200, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      } else {
+        resolve(dataUrl); // Fallback to original if canvas fails
+      }
+    };
+    img.onerror = () => resolve(dataUrl); // Fallback to original on error
+    img.src = dataUrl;
+  });
+}
+
 // Helper function to save to history (export for use in PromptForm)
-export function saveToHistory(item: Omit<VideoHistoryItem, "id" | "createdAt">) {
+export async function saveToHistory(item: Omit<VideoHistoryItem, "id" | "createdAt">) {
   try {
     const stored = localStorage.getItem("sora2-history");
     const history: VideoHistoryItem[] = stored ? JSON.parse(stored) : [];
     
+    // Compress thumbnail if provided to reduce storage size
+    let compressedThumbnail = item.thumbnail;
+    if (item.thumbnail) {
+      try {
+        compressedThumbnail = await compressThumbnail(item.thumbnail);
+      } catch (error) {
+        console.warn("Failed to compress thumbnail:", error);
+        // Continue with original thumbnail
+      }
+    }
+    
     const newItem: VideoHistoryItem = {
       ...item,
+      thumbnail: compressedThumbnail,
       id: `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: Date.now(),
     };
     
     history.unshift(newItem);
     
-    // Keep only last 50 items
-    const trimmed = history.slice(0, 50);
-    localStorage.setItem("sora2-history", JSON.stringify(trimmed));
+    // Keep only last 30 items (reduced from 50 to prevent quota issues)
+    const trimmed = history.slice(0, 30);
+    
+    // Try to save, if it fails due to quota, remove oldest items
+    try {
+      localStorage.setItem("sora2-history", JSON.stringify(trimmed));
+    } catch (quotaError: any) {
+      if (quotaError.name === 'QuotaExceededError') {
+        // Remove thumbnails from older items to free up space
+        const trimmedWithoutThumbnails = trimmed.map((item, index) => 
+          index >= 10 ? { ...item, thumbnail: undefined } : item
+        );
+        try {
+          localStorage.setItem("sora2-history", JSON.stringify(trimmedWithoutThumbnails));
+        } catch (e) {
+          // If still fails, save without thumbnails
+          const noThumbnails = trimmed.map(item => ({ ...item, thumbnail: undefined }));
+          localStorage.setItem("sora2-history", JSON.stringify(noThumbnails));
+        }
+      } else {
+        throw quotaError;
+      }
+    }
     
     return newItem;
   } catch (error) {
